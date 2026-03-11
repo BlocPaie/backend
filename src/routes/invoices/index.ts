@@ -16,11 +16,11 @@ import {
 
 const router = Router();
 
-// POST / — Create a new invoice (contractor only)
+// POST / — Create a new invoice (company only)
 router.post(
   '/',
   authenticate,
-  requireRole('contractor'),
+  requireRole('company'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parseResult = CreateInvoiceSchema.safeParse(req.body);
@@ -35,31 +35,31 @@ router.post(
         return;
       }
 
-      const { companyId, vaultId, amount, currency, description, issuedAt } = parseResult.data;
+      const { contractorId, vaultId, amount, currency, description, issuedAt } = parseResult.data;
 
-      // Resolve contractor from JWT sub (portoAccountAddress)
-      const contractor = await Contractor.findOne({
+      // Resolve company from JWT sub (portoAccountAddress)
+      const company = await Company.findOne({
         portoAccountAddress: req.user.sub.toLowerCase(),
       });
-      if (!contractor) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Contractor not found for the authenticated address',
-          },
-        });
-        return;
-      }
-
-      // Check company exists
-      const company = await Company.findById(companyId);
       if (!company) {
         res.status(404).json({
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: 'Company not found',
+            message: 'Company not found for the authenticated address',
+          },
+        });
+        return;
+      }
+
+      // Check contractor exists
+      const contractor = await Contractor.findById(contractorId);
+      if (!contractor) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Contractor not found',
           },
         });
         return;
@@ -83,7 +83,7 @@ router.post(
           success: false,
           error: {
             code: 'INVALID_VAULT',
-            message: 'Vault does not belong to the specified company',
+            message: 'Vault does not belong to the authenticated company',
           },
         });
         return;
@@ -111,7 +111,7 @@ router.post(
         amount,
         currency,
         description,
-        status: 'draft',
+        status: 'pending',
         invoiceHash,
         issuedAt: issuedAtDate,
       });
@@ -277,9 +277,9 @@ router.get(
   }
 );
 
-// POST /:id/approve — Approve a draft invoice (company only)
+// POST /:id/cancel — Cancel a pending invoice (company only)
 router.post(
-  '/:id/approve',
+  '/:id/cancel',
   authenticate,
   requireRole('company'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -287,10 +287,7 @@ router.post(
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         res.status(404).json({
           success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Invoice not found',
-          },
+          error: { code: 'NOT_FOUND', message: 'Invoice not found' },
         });
         return;
       }
@@ -299,107 +296,34 @@ router.post(
       if (!invoice) {
         res.status(404).json({
           success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Invoice not found',
-          },
+          error: { code: 'NOT_FOUND', message: 'Invoice not found' },
         });
         return;
       }
 
-      // Check company access
       const company = await Company.findOne({
         portoAccountAddress: req.user.sub.toLowerCase(),
       });
       if (!company || company._id.toString() !== invoice.companyId.toString()) {
         res.status(403).json({
           success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this invoice',
-          },
+          error: { code: 'FORBIDDEN', message: 'You do not have access to this invoice' },
         });
         return;
       }
 
-      if (invoice.status !== 'draft') {
+      if (invoice.status !== 'pending') {
         res.status(409).json({
           success: false,
           error: {
             code: 'INVALID_STATUS',
-            message: `Cannot approve invoice with status '${invoice.status}'. Invoice must be in 'draft' status.`,
+            message: `Cannot cancel invoice with status '${invoice.status}'. Invoice must be pending.`,
           },
         });
         return;
       }
 
-      invoice.status = 'approved';
-      await invoice.save();
-
-      res.json({ success: true, data: invoice });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// POST /:id/reject — Reject a draft invoice (company only)
-router.post(
-  '/:id/reject',
-  authenticate,
-  requireRole('company'),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Invoice not found',
-          },
-        });
-        return;
-      }
-
-      const invoice = await Invoice.findById(req.params.id);
-      if (!invoice) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Invoice not found',
-          },
-        });
-        return;
-      }
-
-      // Check company access
-      const company = await Company.findOne({
-        portoAccountAddress: req.user.sub.toLowerCase(),
-      });
-      if (!company || company._id.toString() !== invoice.companyId.toString()) {
-        res.status(403).json({
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this invoice',
-          },
-        });
-        return;
-      }
-
-      if (invoice.status !== 'draft') {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'INVALID_STATUS',
-            message: `Cannot reject invoice with status '${invoice.status}'. Invoice must be in 'draft' status.`,
-          },
-        });
-        return;
-      }
-
-      invoice.status = 'rejected';
+      invoice.status = 'cancelled';
       await invoice.save();
 
       res.json({ success: true, data: invoice });
@@ -508,12 +432,12 @@ router.post(
         return;
       }
 
-      if (invoice.status !== 'approved') {
+      if (invoice.status !== 'pending') {
         res.status(409).json({
           success: false,
           error: {
             code: 'INVALID_STATUS',
-            message: `Cannot confirm registration for invoice with status '${invoice.status}'. Invoice must be in 'approved' status.`,
+            message: `Cannot confirm registration for invoice with status '${invoice.status}'. Invoice must be pending.`,
           },
         });
         return;
@@ -534,7 +458,7 @@ router.post(
         return;
       }
 
-      invoice.status = 'registered';
+      // Status stays pending — registration is an intermediate on-chain step
       invoice.chequeId = chequeId;
       invoice.transactions.push({
         txHash,
@@ -611,12 +535,12 @@ router.post(
         return;
       }
 
-      if (invoice.status !== 'registered') {
+      if (invoice.status !== 'pending') {
         res.status(409).json({
           success: false,
           error: {
             code: 'INVALID_STATUS',
-            message: `Cannot confirm payment for invoice with status '${invoice.status}'. Invoice must be in 'registered' status.`,
+            message: `Cannot confirm payment for invoice with status '${invoice.status}'. Invoice must be pending.`,
           },
         });
         return;
@@ -637,7 +561,7 @@ router.post(
         return;
       }
 
-      invoice.status = 'paid';
+      invoice.status = 'executed';
       invoice.transactions.push({
         txHash,
         txType: 'execute',
@@ -713,12 +637,12 @@ router.post(
         return;
       }
 
-      if (invoice.status !== 'registered') {
+      if (invoice.status !== 'pending') {
         res.status(409).json({
           success: false,
           error: {
             code: 'INVALID_STATUS',
-            message: `Cannot confirm cancellation for invoice with status '${invoice.status}'. Invoice must be in 'registered' status.`,
+            message: `Cannot confirm cancellation for invoice with status '${invoice.status}'. Invoice must be pending.`,
           },
         });
         return;

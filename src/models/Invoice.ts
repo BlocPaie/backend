@@ -16,7 +16,7 @@ export interface IInvoice extends Document {
   amount: string;
   currency: string;
   description?: string;
-  status: 'draft' | 'approved' | 'rejected' | 'registered' | 'paid' | 'cancelled';
+  status: 'pending' | 'executed' | 'cancelled';
   invoiceHash: string;
   chequeId?: string;
   issuedAt: Date;
@@ -93,8 +93,8 @@ const InvoiceSchema = new Schema<IInvoice>(
     status: {
       type: String,
       required: true,
-      enum: ['draft', 'approved', 'rejected', 'registered', 'paid', 'cancelled'],
-      default: 'draft',
+      enum: ['pending', 'executed', 'cancelled'],
+      default: 'pending',
     },
     invoiceHash: {
       type: String,

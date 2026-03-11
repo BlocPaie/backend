@@ -19,7 +19,7 @@ const txHash = z
   .regex(txHashRegex, 'Must be a valid transaction hash (0x followed by 64 hex chars)');
 
 export const CreateInvoiceSchema = z.object({
-  companyId: mongoObjectId,
+  contractorId: mongoObjectId,
   vaultId: mongoObjectId,
   amount: z
     .string()
@@ -54,9 +54,7 @@ export const InvoiceQuerySchema = z.object({
   companyId: z.string().optional(),
   contractorId: z.string().optional(),
   vaultId: z.string().optional(),
-  status: z
-    .enum(['draft', 'approved', 'rejected', 'registered', 'paid', 'cancelled'])
-    .optional(),
+  status: z.enum(['pending', 'executed', 'cancelled']).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });

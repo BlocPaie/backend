@@ -6,11 +6,11 @@ import { CreateVaultSchema } from '../../validators/registry';
 
 const router = Router();
 
-// POST / — Create a new vault (platform only)
+// POST / — Register a vault after on-chain deployment (company or platform)
 router.post(
   '/',
   authenticate,
-  requireRole('platform'),
+  requireRole('company', 'platform'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parseResult = CreateVaultSchema.safeParse(req.body);
@@ -37,6 +37,20 @@ router.post(
           },
         });
         return;
+      }
+
+      // Company role: verify the companyId in the body matches their JWT identity
+      if (req.user.role === 'company') {
+        if (req.user.sub.toLowerCase() !== company.portoAccountAddress.toLowerCase()) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message: 'You can only register vaults for your own company',
+            },
+          });
+          return;
+        }
       }
 
       const existingVault = await Vault.findOne({

@@ -6,11 +6,9 @@ import { CreateContractorSchema } from '../../validators/registry';
 
 const router = Router();
 
-// POST / — Create a new contractor (platform only)
+// POST / — Create a new contractor (public — called on first onboarding, before JWT exists)
 router.post(
   '/',
-  authenticate,
-  requireRole('platform'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parseResult = CreateContractorSchema.safeParse(req.body);

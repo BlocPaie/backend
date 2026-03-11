@@ -18,11 +18,9 @@ const LinkContractorSchema = z.object({
 
 const router = Router();
 
-// POST / — Create a new company (platform only)
+// POST / — Create a new company (public — called on first onboarding, before JWT exists)
 router.post(
   '/',
-  authenticate,
-  requireRole('platform'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parseResult = CreateCompanySchema.safeParse(req.body);

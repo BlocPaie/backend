@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
+import { Company } from '../../models/Company';
 import { Contractor } from '../../models/Contractor';
 import { Vault } from '../../models/Vault';
 import { AddressMapping } from '../../models/AddressMapping';
@@ -7,11 +8,11 @@ import { CreateAddressMappingSchema, AddressMappingQuerySchema } from '../../val
 
 const router = Router();
 
-// POST / — Create a new address mapping (platform only)
+// POST / — Create a new address mapping (company or platform)
 router.post(
   '/',
   authenticate,
-  requireRole('platform'),
+  requireRole('company', 'platform'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parseResult = CreateAddressMappingSchema.safeParse(req.body);
@@ -50,6 +51,23 @@ router.post(
           },
         });
         return;
+      }
+
+      // Company role: verify they own the vault
+      if (req.user.role === 'company') {
+        const company = await Company.findOne({
+          portoAccountAddress: req.user.sub.toLowerCase(),
+        });
+        if (!company || vault.companyId.toString() !== company._id.toString()) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message: 'You do not have access to this vault',
+            },
+          });
+          return;
+        }
       }
 
       if (vault.vaultType !== 'erc20') {
