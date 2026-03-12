@@ -47,6 +47,7 @@ router.post(
             code: 'CONFLICT',
             message: 'A company with this portoAccountAddress already exists',
           },
+          data: existing,
         });
         return;
       }
@@ -55,6 +56,30 @@ router.post(
       await company.save();
 
       res.status(201).json({ success: true, data: company });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /me — Get the authenticated company's own profile
+router.get(
+  '/me',
+  authenticate,
+  requireRole('company', 'platform'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const company = await Company.findOne({
+        portoAccountAddress: req.user.sub.toLowerCase(),
+      });
+      if (!company) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Company not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: company });
     } catch (err) {
       next(err);
     }

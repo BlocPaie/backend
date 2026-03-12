@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import { errorHandler } from './middleware/error';
 import companiesRouter from './routes/registry/companies';
 import contractorsRouter from './routes/registry/contractors';
@@ -7,6 +8,12 @@ import addressMappingsRouter from './routes/registry/addressMappings';
 import invoicesRouter from './routes/invoices/index';
 
 const app = express();
+
+// CORS
+app.use(cors({
+  origin: process.env.FRONTEND_URL ?? 'https://localhost:3000',
+  credentials: true,
+}));
 
 // Body parsing middleware
 app.use(express.json());

@@ -49,6 +49,30 @@ router.post(
   }
 );
 
+// GET /me — Get the authenticated contractor's own profile
+router.get(
+  '/me',
+  authenticate,
+  requireRole('contractor', 'platform'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const contractor = await Contractor.findOne({
+        portoAccountAddress: req.user.sub.toLowerCase(),
+      });
+      if (!contractor) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Contractor not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: contractor });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /:id — Get a contractor by ID
 router.get(
   '/:id',
