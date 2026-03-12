@@ -9,9 +9,17 @@ import invoicesRouter from './routes/invoices/index';
 
 const app = express();
 
-// CORS
+// CORS — FRONTEND_URL may be comma-separated for multiple origins
+const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim());
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'https://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
 }));
 
