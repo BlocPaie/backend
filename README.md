@@ -118,6 +118,8 @@ JWT payload must contain `sub` (Porto Account address) and `role` (`company`, `c
 | GET | `/contractors/:id` | any | Get contractor profile |
 | POST | `/vaults` | platform | Register a deployed vault |
 | GET | `/vaults/:address` | any | Look up vault by on-chain address |
+| POST | `/vaults/:address/transactions` | company | Record a deposit or withdraw transaction |
+| GET | `/vaults/:address/transactions` | company | List all vault transactions (all 5 types), newest first |
 | POST | `/address-mappings` | platform | Assign fresh address (ERC20Vault only) |
 | GET | `/address-mappings/by-contractor` | any | Get fresh address for a contractor/vault pair |
 | GET | `/address-mappings/resolve/:address` | platform | Resolve fresh address → contractor |
@@ -145,6 +147,20 @@ draft → approved → registered → paid
 ```
 
 Status transitions are strict and enforced server-side.
+
+### Vault Transactions
+
+`Vault.transactions[]` is the single source of truth for all payroll activity shown on the transactions page. Five transaction types are recorded here:
+
+| Type | Written by | Fields |
+|------|-----------|--------|
+| `deposit` | Frontend hook, after tx confirms | `txHash`, `amount`, `blockNumber` |
+| `withdraw` | Frontend hook, after tx confirms | `txHash`, `amount`, `blockNumber` |
+| `register` | Backend, inside `confirm-registration` handler | `txHash`, `amount`, `contractorName`, `invoiceId`, `blockNumber` |
+| `execute` | Backend, inside `confirm-payment` handler | `txHash`, `amount`, `contractorName`, `invoiceId`, `blockNumber` |
+| `cancel` | Backend, inside `confirm-cancellation` handler | `txHash`, `amount`, `contractorName`, `invoiceId`, `blockNumber` |
+
+Amounts for confidential vaults are stored in plaintext here (taken from the invoice record), so the transactions page never needs to decrypt anything on-chain.
 
 ## Key Design Decisions
 
