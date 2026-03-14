@@ -49,9 +49,17 @@ export const SetPayoutAddressSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid Ethereum address'),
 });
 
+export const CreateVaultTransactionSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Must be a valid tx hash'),
+  txType: z.enum(['deposit', 'withdraw']),
+  amount: z.string().regex(/^\d+(\.\d{1,6})?$/, 'Must be a valid amount'),
+  blockNumber: z.number().int().nonnegative(),
+});
+
 export type SetPayoutAddressInput = z.infer<typeof SetPayoutAddressSchema>;
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
 export type CreateContractorInput = z.infer<typeof CreateContractorSchema>;
 export type CreateVaultInput = z.infer<typeof CreateVaultSchema>;
 export type CreateAddressMappingInput = z.infer<typeof CreateAddressMappingSchema>;
 export type AddressMappingQueryInput = z.infer<typeof AddressMappingQuerySchema>;
+export type CreateVaultTransactionInput = z.infer<typeof CreateVaultTransactionSchema>;

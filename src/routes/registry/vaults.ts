@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { Company } from '../../models/Company';
 import { Vault } from '../../models/Vault';
-import { CreateVaultSchema } from '../../validators/registry';
+import { CreateVaultSchema, CreateVaultTransactionSchema } from '../../validators/registry';
 
 const router = Router();
 
@@ -77,6 +77,92 @@ router.post(
       await vault.save();
 
       res.status(201).json({ success: true, data: vault });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /:address/transactions — Record a deposit/withdraw tx (company auth, frontend only)
+router.post(
+  '/:address/transactions',
+  authenticate,
+  requireRole('company'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parseResult = CreateVaultTransactionSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: parseResult.error.errors.map((e) => e.message).join(', '),
+          },
+        });
+        return;
+      }
+
+      const vault = await Vault.findOne({ vaultAddress: req.params.address.toLowerCase() });
+      if (!vault) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Vault not found' },
+        });
+        return;
+      }
+
+      const company = await Company.findOne({ portoAccountAddress: req.user.sub.toLowerCase() });
+      if (!company || company._id.toString() !== vault.companyId.toString()) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'You do not own this vault' },
+        });
+        return;
+      }
+
+      const { txHash, txType, amount, blockNumber } = parseResult.data;
+
+      // Idempotent — skip if already recorded
+      const alreadyRecorded = vault.transactions.some((t) => t.txHash === txHash && t.txType === txType);
+      if (!alreadyRecorded) {
+        vault.transactions.push({ txHash, txType, amount, blockNumber, createdAt: new Date() });
+        await vault.save();
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /:address/transactions — List all vault transactions (company auth)
+router.get(
+  '/:address/transactions',
+  authenticate,
+  requireRole('company'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const vault = await Vault.findOne({ vaultAddress: req.params.address.toLowerCase() });
+      if (!vault) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Vault not found' },
+        });
+        return;
+      }
+
+      const company = await Company.findOne({ portoAccountAddress: req.user.sub.toLowerCase() });
+      if (!company || company._id.toString() !== vault.companyId.toString()) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'You do not own this vault' },
+        });
+        return;
+      }
+
+      const sorted = [...vault.transactions].sort((a, b) => b.blockNumber - a.blockNumber);
+      res.json({ success: true, data: sorted });
     } catch (err) {
       next(err);
     }

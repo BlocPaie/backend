@@ -471,6 +471,24 @@ router.post(
 
       await invoice.save();
 
+      // Also record in Vault.transactions (best-effort, don't fail the request)
+      try {
+        const vault = await Vault.findOne({ vaultAddress: vaultAddress.toLowerCase() });
+        if (vault) {
+          const contractor = await Contractor.findById(invoice.contractorId);
+          vault.transactions.push({
+            txHash,
+            txType: 'register',
+            amount: invoice.amount,
+            contractorName: contractor?.name,
+            invoiceId: invoice._id.toString(),
+            blockNumber,
+            createdAt: new Date(),
+          });
+          await vault.save();
+        }
+      } catch {}
+
       res.json({ success: true, data: invoice });
     } catch (err) {
       next(err);
@@ -573,6 +591,24 @@ router.post(
 
       await invoice.save();
 
+      // Also record in Vault.transactions (best-effort)
+      try {
+        const vault = await Vault.findOne({ vaultAddress: vaultAddress.toLowerCase() });
+        if (vault) {
+          const invoiceContractor = await Contractor.findById(invoice.contractorId);
+          vault.transactions.push({
+            txHash,
+            txType: 'execute',
+            amount: invoice.amount,
+            contractorName: invoiceContractor?.name,
+            invoiceId: invoice._id.toString(),
+            blockNumber,
+            createdAt: new Date(),
+          });
+          await vault.save();
+        }
+      } catch {}
+
       res.json({ success: true, data: invoice });
     } catch (err) {
       next(err);
@@ -673,6 +709,24 @@ router.post(
       });
 
       await invoice.save();
+
+      // Also record in Vault.transactions (best-effort)
+      try {
+        const vault = await Vault.findOne({ vaultAddress: vaultAddress.toLowerCase() });
+        if (vault) {
+          const invoiceContractor = await Contractor.findById(invoice.contractorId);
+          vault.transactions.push({
+            txHash,
+            txType: 'cancel',
+            amount: invoice.amount,
+            contractorName: invoiceContractor?.name,
+            invoiceId: invoice._id.toString(),
+            blockNumber,
+            createdAt: new Date(),
+          });
+          await vault.save();
+        }
+      } catch {}
 
       res.json({ success: true, data: invoice });
     } catch (err) {
