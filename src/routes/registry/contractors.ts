@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { Contractor } from '../../models/Contractor';
-import { CreateContractorSchema } from '../../validators/registry';
+import { CreateContractorSchema, SetPayoutAddressSchema } from '../../validators/registry';
 
 const router = Router();
 
@@ -66,6 +66,60 @@ router.get(
         });
         return;
       }
+      res.json({ success: true, data: contractor });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PUT /:id/payout-address — Set payout address (contractor only, own record)
+router.put(
+  '/:id/payout-address',
+  authenticate,
+  requireRole('contractor'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Contractor not found' },
+        });
+        return;
+      }
+
+      const contractor = await Contractor.findById(req.params.id);
+      if (!contractor) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Contractor not found' },
+        });
+        return;
+      }
+
+      if (req.user.sub.toLowerCase() !== contractor.portoAccountAddress.toLowerCase()) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'You can only update your own payout address' },
+        });
+        return;
+      }
+
+      const parseResult = SetPayoutAddressSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: parseResult.error.errors.map((e) => e.message).join(', '),
+          },
+        });
+        return;
+      }
+
+      contractor.payoutAddress = parseResult.data.payoutAddress;
+      await contractor.save();
+
       res.json({ success: true, data: contractor });
     } catch (err) {
       next(err);

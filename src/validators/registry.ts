@@ -43,6 +43,13 @@ export const AddressMappingQuerySchema = z.object({
   contractorId: z.string(),
 });
 
+export const SetPayoutAddressSchema = z.object({
+  payoutAddress: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'Must be a valid Ethereum address'),
+});
+
+export type SetPayoutAddressInput = z.infer<typeof SetPayoutAddressSchema>;
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
 export type CreateContractorInput = z.infer<typeof CreateContractorSchema>;
 export type CreateVaultInput = z.infer<typeof CreateVaultSchema>;
